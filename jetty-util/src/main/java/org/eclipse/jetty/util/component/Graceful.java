@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.FutureCallback;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.annotation.ManagedAttribute;
 
 /**
  * <p>Jetty components that wish to be part of a Graceful shutdown implement this interface so that

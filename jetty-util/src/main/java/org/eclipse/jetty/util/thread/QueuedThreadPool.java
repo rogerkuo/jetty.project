@@ -221,47 +221,37 @@ public class QueuedThreadPool extends ContainerLifeCycle implements ThreadFactor
                 LOG.warn("Stopped without executing or closing {}", job);
         }
 
+        Thread.yield();
 
-        // If stop timeout try to gracefully stop
-        long timeout = getStopTimeout();
-        if (timeout > 0)
+        // interrupt remaining threads
+        for (Thread thread : _threads)
         {
-
-            // try to let jobs complete naturally for half our stop time
-            joinThreads(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout) / 2);
-
-            // If we still have threads running, get a bit more aggressive
-
-            // interrupt remaining threads
-            for (Thread thread : _threads)
-            {
-                if (LOG.isDebugEnabled())
-                    LOG.debug("Interrupting {}", thread);
-                thread.interrupt();
-            }
-
-            // wait again for the other half of our stop time
-            joinThreads(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout) / 2);
-
-            Thread.yield();
             if (LOG.isDebugEnabled())
+                LOG.debug("Interrupting {}", thread);
+            thread.interrupt();
+        }
+
+        Thread.yield();
+        joinThreads(TimeUnit.MILLISECONDS.toNanos(10));
+        Thread.yield();
+
+        if (LOG.isDebugEnabled())
+        {
+            for (Thread unstopped : _threads)
             {
-                for (Thread unstopped : _threads)
+                StringBuilder dmp = new StringBuilder();
+                for (StackTraceElement element : unstopped.getStackTrace())
                 {
-                    StringBuilder dmp = new StringBuilder();
-                    for (StackTraceElement element : unstopped.getStackTrace())
-                    {
-                        dmp.append(System.lineSeparator()).append("\tat ").append(element);
-                    }
-                    LOG.warn("Couldn't stop {}{}", unstopped, dmp.toString());
+                    dmp.append(System.lineSeparator()).append("\tat ").append(element);
                 }
+                LOG.warn("Couldn't stop {}{}", unstopped, dmp.toString());
             }
-            else
+        }
+        else
+        {
+            for (Thread unstopped : _threads)
             {
-                for (Thread unstopped : _threads)
-                {
-                    LOG.warn("{} Couldn't stop {}", this, unstopped);
-                }
+                LOG.warn("{} Couldn't stop {}", this, unstopped);
             }
         }
 

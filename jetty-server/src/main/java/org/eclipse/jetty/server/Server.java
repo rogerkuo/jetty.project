@@ -41,6 +41,7 @@ import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.http.HttpURI;
 import org.eclipse.jetty.http.PreEncodedHttpField;
+import org.eclipse.jetty.server.handler.AbstractHandlerContainer;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerWrapper;
@@ -54,6 +55,7 @@ import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.annotation.Name;
 import org.eclipse.jetty.util.component.AttributeContainerMap;
+import org.eclipse.jetty.util.component.Graceful;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
@@ -70,7 +72,7 @@ import org.eclipse.jetty.util.thread.ThreadPool;
  * to run jobs that will eventually call the handle method.
  */
 @ManagedObject(value = "Jetty HTTP Servlet server")
-public class Server extends HandlerWrapper implements Attributes
+public class Server extends HandlerWrapper implements Attributes, AbstractHandlerContainer.GracefulContainer
 {
     private static final Logger LOG = Log.getLogger(Server.class);
 
@@ -86,6 +88,7 @@ public class Server extends HandlerWrapper implements Attributes
     private boolean _dryRun;
     private final AutoLock _dateLock = new AutoLock();
     private volatile DateField _dateField;
+    private long _stopTimeout;
 
     public Server()
     {
@@ -173,22 +176,26 @@ public class Server extends HandlerWrapper implements Attributes
         return Jetty.VERSION;
     }
 
-    public boolean getStopAtShutdown()
-    {
-        return _stopAtShutdown;
-    }
-
     /**
      * Set a graceful stop time.
      * The {@link StatisticsHandler} must be configured so that open connections can
      * be tracked for a graceful shutdown.
      *
-     * @see org.eclipse.jetty.util.component.ContainerLifeCycle#setStopTimeout(long)
      */
-    @Override
     public void setStopTimeout(long stopTimeout)
     {
-        super.setStopTimeout(stopTimeout);
+        _stopTimeout = stopTimeout;
+    }
+
+    @ManagedAttribute("Time in ms to gracefully shutdown the server")
+    public long getStopTimeout()
+    {
+        return _stopTimeout;
+    }
+
+    public boolean getStopAtShutdown()
+    {
+        return _stopAtShutdown;
     }
 
     /**
@@ -468,15 +475,7 @@ public class Server extends HandlerWrapper implements Attributes
 
         try
         {
-            // list if graceful futures
-            List<Future<Void>> futures = new ArrayList<>();
-            // First shutdown the network connectors to stop accepting new connections
-            for (Connector connector : _connectors)
-            {
-                futures.add(connector.shutdown());
-            }
-            // then shutdown all graceful handlers 
-            doShutdown(futures);
+            shutdown(this);
         }
         catch (Throwable e)
         {

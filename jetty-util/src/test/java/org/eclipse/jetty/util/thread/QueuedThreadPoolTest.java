@@ -413,7 +413,6 @@ public class QueuedThreadPoolTest extends AbstractThreadPoolTest
         tp.setMinThreads(1);
         tp.setMaxThreads(2);
         tp.setIdleTimeout(900);
-        tp.setStopTimeout(500);
         tp.setThreadsPriority(Thread.NORM_PRIORITY - 1);
         tp.start();
 
@@ -613,34 +612,6 @@ public class QueuedThreadPoolTest extends AbstractThreadPoolTest
         job2.stop();
         job4.stop();
         tp.stop();
-    }
-
-    @Test
-    public void testMaxStopTime() throws Exception
-    {
-        QueuedThreadPool tp = new QueuedThreadPool();
-        long stopTimeout = 500;
-        tp.setStopTimeout(stopTimeout);
-        tp.start();
-        CountDownLatch interruptedLatch = new CountDownLatch(1);
-        tp.execute(() ->
-        {
-            try
-            {
-                Thread.sleep(10 * stopTimeout);
-            }
-            catch (InterruptedException expected)
-            {
-                interruptedLatch.countDown();
-            }
-        });
-
-        long beforeStop = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-        tp.stop();
-        long afterStop = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-        assertTrue(tp.isStopped());
-        assertTrue(afterStop - beforeStop < 1000);
-        assertTrue(interruptedLatch.await(5, TimeUnit.SECONDS));
     }
 
     private void waitForIdle(QueuedThreadPool tp, int idle)
